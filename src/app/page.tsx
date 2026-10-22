@@ -43,6 +43,9 @@ export default function Home() {
     "am-ET",
   );
   const { speak, isSpeaking } = useSpeakText();
+  const [typedQuestion, setTypedQuestion] = useState("");
+  const [typedAnswer, setTypedAnswer] = useState<string | null>(null);
+  const [isTyping, setIsTyping] = useState(false);
 
   useEffect(() => {
     if (typeof navigator === "undefined" || !navigator.geolocation) {
@@ -130,6 +133,36 @@ export default function Home() {
     e.preventDefault();
     if (searchResults.length > 0) {
       handleSelectSearchResult(searchResults[0]);
+    }
+  }
+
+  async function handleTextSubmit(e: React.FormEvent) {
+    e.preventDefault();
+    if (!typedQuestion.trim() || !facts) return;
+
+    setIsTyping(true);
+    setTypedAnswer(null);
+
+    try {
+      const res = await fetch("/api/text-ask", {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({
+          text: typedQuestion,
+          facts,
+          crop,
+          placeLabel,
+        }),
+      });
+
+      if (!res.ok) throw new Error("Failed");
+      const data = await res.json();
+      setTypedAnswer(data.answer);
+    } catch (err) {
+      console.error(err);
+      setTypedAnswer("Sorry, I couldn't process that. Please try again.");
+    } finally {
+      setIsTyping(false);
     }
   }
 
@@ -650,18 +683,40 @@ export default function Home() {
                 placeLabel={placeLabel}
               />
 
-              <div className="flex items-center gap-3 rounded-full border border-[#d9ded4] bg-white px-5 py-3.5">
+              <form
+                onSubmit={handleTextSubmit}
+                className="flex items-center gap-3 rounded-full border border-[#d9ded4] bg-white px-5 py-3.5"
+              >
                 <input
+                  value={typedQuestion}
+                  onChange={(e) => setTypedQuestion(e.target.value)}
                   placeholder="Or type your question here..."
                   className="min-w-0 flex-1 bg-transparent text-sm outline-none placeholder:text-[#9aa39d]"
+                  disabled={isTyping}
                 />
                 <button
-                  className="grid h-9 w-9 place-items-center rounded-full bg-[#e1f06a] text-[#173d2d]"
+                  type="submit"
+                  disabled={isTyping || !typedQuestion.trim()}
+                  className="grid h-9 w-9 place-items-center rounded-full bg-[#e1f06a] text-[#173d2d] disabled:opacity-50"
                   aria-label="Send question"
                 >
-                  <Icon name="arrow" size={18} />
+                  {isTyping ? (
+                    <div className="h-4 w-4 animate-spin rounded-full border-2 border-[#173d2d] border-t-transparent" />
+                  ) : (
+                    <Icon name="arrow" size={18} />
+                  )}
                 </button>
-              </div>
+              </form>
+
+              {/* Show typed answer below the input */}
+              {typedAnswer && (
+                <div className="mt-4 rounded-xl bg-[#173d2d] p-4 text-left text-sm text-white">
+                  <span className="font-semibold text-[#e1f06a]">
+                    Zinab says:
+                  </span>
+                  <p className="mt-1 text-white/80">{typedAnswer}</p>
+                </div>
+              )}
             </div>
           </div>
         </section>
